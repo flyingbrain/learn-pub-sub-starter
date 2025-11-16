@@ -66,3 +66,35 @@ func DeclareAndBind(
 
 	return chanl, q, nil
 }
+
+func SubscribeJSON[T any](
+	conn *amqp.Connection,
+	exchange,
+	queueName,
+	key string,
+	queueType SimpleQueueType,
+	handler func(T),
+) error {
+	ch, _, err := DeclareAndBind(conn, exchange, queueName, key, queueType)
+	if err != nil {
+		return fmt.Errorf("can't declare the queue %w", err)
+	}
+
+	chanl, err := ch.Consume(queueName, "", false, false, false, false, nil)
+	if err != nil {
+		return fmt.Errorf("can't create Channel %w", err)
+	}
+	go func() {
+		for message := range chanl {
+			var mess T
+
+			if err := json.Unmarshal(message.Body, &mess); err != nil {
+			}
+			handler(mess)
+			message.Ack(false)
+			fmt.Print("> ")
+		}
+	}()
+
+	return nil
+}
